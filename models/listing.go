@@ -2,6 +2,9 @@ package models
 
 import (
 	"encoding/json"
+	"fmt"
+	"log"
+	"net/url"
 	"strings"
 	"time"
 )
@@ -55,10 +58,15 @@ func (t *Thing) GetPublishTime() time.Time {
 }
 
 func (t *Thing) GetURL() string {
+	// we always strip out the query parameters
+	toCheck, err := url.Parse(t.Data["url"].(string))
+	if err != nil {
+		log.Printf("error getting url: %s", err.Error())
+		return ""
+	}
 	// we check for an amp suffix
 	ampSuffixes := []string{"/amp", "/amp/"}
-	newUrl := t.Data["url"].(string)
-
+	newUrl := fmt.Sprintf("%s://%s%s", toCheck.Scheme, toCheck.Host, toCheck.Path)
 	for _, suffix := range ampSuffixes {
 		newUrl = strings.TrimSuffix(newUrl, suffix)
 	}
