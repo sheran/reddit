@@ -28,6 +28,7 @@ type Creds struct {
 }
 
 func NewCredsFromTomlFile(credsFile string) (*Creds, error) {
+	log.Printf("[+] loading creds file: %s\n", credsFile)
 	var creds *Creds
 	_, err := toml.DecodeFile(credsFile, &creds)
 	if err != nil {
