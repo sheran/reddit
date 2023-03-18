@@ -193,7 +193,7 @@ func (r *Reddit) GetListing(fetchUrl *url.URL) (*models.Listing, error) {
 		}
 		return listing, nil
 	} else if resp.StatusCode != 200 {
-		return nil, fmt.Errorf("non 200 status code: %d", resp.StatusCode)
+		return nil, fmt.Errorf("non 200 status code: %d status: %s", resp.StatusCode, resp.Status)
 	}
 	return ReadJsonListing(resp.Body)
 }
