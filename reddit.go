@@ -179,7 +179,7 @@ func (r *Reddit) GetListing(fetchUrl *url.URL) (*models.Listing, error) {
 		log.Printf("error in http request %d\n", resp.StatusCode)
 		return nil, err
 	}
-
+	defer resp.Body.Close()
 	if resp.StatusCode == 401 {
 		t, err := getBearerToken(r.creds, true)
 		if err != nil {
@@ -191,9 +191,9 @@ func (r *Reddit) GetListing(fetchUrl *url.URL) (*models.Listing, error) {
 			return nil, err
 		}
 		return listing, nil
+	} else if resp.StatusCode != 200 {
+		return nil, fmt.Errorf("non 200 status code: %d", resp.StatusCode)
 	}
-
-	defer resp.Body.Close()
 	return ReadJsonListing(resp.Body)
 }
 
