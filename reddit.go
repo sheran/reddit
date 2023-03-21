@@ -1,7 +1,6 @@
 package reddit
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -129,6 +128,27 @@ func (r *Reddit) StopStream() {
 	r.ChanStream <- true
 }
 
+func (r *Reddit) CheckDups(sub, postTitle string) bool {
+	fetchUrl := &url.URL{
+		Host:     "oauth.reddit.com",
+		Scheme:   "https",
+		Path:     fmt.Sprintf("r/%s/new", sub),
+		RawQuery: "limit=25",
+	}
+	listing, err := r.GetListing(fetchUrl)
+	if err != nil {
+		log.Println(err.Error())
+		return true
+	}
+	for _, child := range listing.Data.Children {
+		if strings.Trim(child.Data["title"].(string), " \n\t") == strings.Trim(postTitle, " \n\t") {
+			return true
+		}
+	}
+
+	return false
+}
+
 func (r *Reddit) StartStream(sub string, output chan *models.Listing) {
 	go func() {
 		oldData, err := r.GetLastPost(sub, "")
@@ -198,32 +218,6 @@ func (r *Reddit) GetListing(fetchUrl *url.URL) (*models.Listing, error) {
 	return ReadJsonListing(resp.Body)
 }
 
-func (r *Reddit) PostText(post *models.Post) ([]byte, error) {
-	jsonPostData, err := json.Marshal(post)
-	if err != nil {
-		return nil, err
-	}
-	postUrl := "https://oauth.reddit.com/api/submit"
-	req, err := http.NewRequest("POST", postUrl, bytes.NewBuffer(jsonPostData))
-	if err != nil {
-		return nil, err
-	}
-	req.Header.Set("Authorization", fmt.Sprintf("bearer %s", r.token))
-	req.Header.Set("User-Agent", r.creds.Agent)
-	req.Header.Set("Content-Type", "application/json")
-	resp, err := r.Client.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-	responseBody, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-	return responseBody, nil
-
-}
-
 func (r *Reddit) PostForm(post *models.Post) ([]byte, error) {
 	postURL := "https://oauth.reddit.com/api/submit"
 	postData := url.Values{
@@ -233,6 +227,9 @@ func (r *Reddit) PostForm(post *models.Post) ([]byte, error) {
 		"kind":      {post.Kind},
 		"api_type":  {post.ApiType},
 		"extension": {post.Extension},
+	}
+	if r.CheckDups(post.Subreddit, post.Title) {
+		return nil, errors.New("post is a duplicate")
 	}
 	req, err := http.NewRequest("POST", postURL, strings.NewReader(postData.Encode()))
 	if err != nil {

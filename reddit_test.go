@@ -4,11 +4,9 @@ import (
 	"fmt"
 	"log"
 	"testing"
-
-	"github.com/sheran/reddit/models"
 )
 
-func TestFetch(t *testing.T) {
+func TestScavenge(t *testing.T) {
 	log.SetFlags(log.Ldate | log.Ltime | log.Lshortfile)
 	creds, err := NewCredsFromTomlFile("creds.toml")
 	if err != nil {
@@ -16,18 +14,6 @@ func TestFetch(t *testing.T) {
 	}
 
 	reddit := NewReddit(creds)
-	post := &models.Post{
-		Title:     "Prepping for github2 ",
-		Body:      "This is body text",
-		Subreddit: "sneakpeekf1tests",
-		ApiType:   "json",
-		Kind:      "self",
-		Extension: "json",
-	}
+	fmt.Println(reddit.CheckDups("NonFatF1News", "Alonso gets Saudi GP F1 podium back after penalty overturned"))
 
-	body, err := reddit.PostForm(post)
-	if err != nil {
-		panic(err)
-	}
-	fmt.Println(string(body))
 }
