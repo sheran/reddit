@@ -14,6 +14,8 @@ func TestScavenge(t *testing.T) {
 	}
 
 	reddit := NewReddit(creds)
-	fmt.Println(reddit.CheckDups("NonFatF1News", "Alonso gets Saudi GP F1 podium back after penalty overturned"))
+	for i := 0; i < 5; i++ {
+		fmt.Println(reddit.CheckDups("NonFatF1News", "Alonso gets Saudi GP F1 podium back after penalty overturned"))
+	}
 
 }

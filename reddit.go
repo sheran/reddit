@@ -1,7 +1,6 @@
 package reddit
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -10,6 +9,7 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"time"
 
@@ -17,6 +17,57 @@ import (
 	"github.com/sheran/reddit/models"
 	"golang.org/x/time/rate"
 )
+
+type RateLimit struct {
+	Remaining float64
+	Reset     uint64
+	Used      uint64
+}
+
+func NewRateLimit(hdr http.Header) *RateLimit {
+	prefix := "X-Ratelimit-"
+	ratelimit := &RateLimit{}
+	for key, value := range hdr {
+		if strings.HasPrefix(key, prefix) {
+			if keyVal, found := strings.CutPrefix(key, prefix); found {
+				switch keyVal {
+				case "Used":
+					val, err := strconv.ParseUint(value[0], 10, 64)
+					if err != nil {
+						continue
+					}
+					ratelimit.Used = val
+				case "Reset":
+					val, err := strconv.ParseUint(value[0], 10, 64)
+					if err != nil {
+						continue
+					}
+					ratelimit.Reset = val
+				case "Remaining":
+					flval, err := strconv.ParseFloat(value[0], 64)
+					if err != nil {
+						log.Println(err.Error())
+						continue
+					}
+					ratelimit.Remaining = flval
+				}
+			}
+		}
+	}
+	return ratelimit
+}
+
+func (rl *RateLimit) Wait() {
+	if rl.Remaining <= 10 {
+		log.Printf("No requests left, sleeping %d\n", rl.Reset)
+		time.Sleep(time.Second * time.Duration(rl.Reset))
+	}
+}
+
+func (rl *RateLimit) Limit() float64 {
+	lim := rl.Remaining / float64(rl.Reset)
+	return lim
+}
 
 type Creds struct {
 	Id     string `toml:"client_id"`
@@ -184,9 +235,9 @@ func (r *Reddit) StartStream(sub string, output chan *models.Listing) {
 }
 
 func (r *Reddit) GetListing(fetchUrl *url.URL) (*models.Listing, error) {
-	err := r.Limiter.Wait(context.Background())
-	if err != nil {
-		log.Println(err.Error())
+	if !r.Limiter.Allow() {
+		log.Println("Rate Limit hit, sleeping 2 secs")
+		time.Sleep(2 * time.Second)
 	}
 	req, err := http.NewRequest("GET", fetchUrl.String(), nil)
 	if err != nil {
@@ -201,6 +252,8 @@ func (r *Reddit) GetListing(fetchUrl *url.URL) (*models.Listing, error) {
 		return nil, err
 	}
 	defer resp.Body.Close()
+	rl := NewRateLimit(resp.Header)            // Check
+	r.Limiter.SetLimit(rate.Limit(rl.Limit())) // and set Rate Limit
 	if resp.StatusCode == 401 {
 		t, err := getBearerToken(r.creds, true)
 		if err != nil {
@@ -219,6 +272,10 @@ func (r *Reddit) GetListing(fetchUrl *url.URL) (*models.Listing, error) {
 }
 
 func (r *Reddit) PostForm(post *models.Post) ([]byte, error) {
+	if !r.Limiter.Allow() {
+		log.Println("Rate Limit hit, sleeping 2 secs")
+		time.Sleep(2 * time.Second)
+	}
 	postURL := "https://oauth.reddit.com/api/submit"
 	postData := url.Values{
 		"title":     {post.Title},
@@ -243,6 +300,8 @@ func (r *Reddit) PostForm(post *models.Post) ([]byte, error) {
 		log.Printf("error in http request %d\n", resp.StatusCode)
 		return nil, err
 	}
+	rl := NewRateLimit(resp.Header)            // Check
+	r.Limiter.SetLimit(rate.Limit(rl.Limit())) // and set Rate Limit
 	if resp.StatusCode == 401 {
 		_, err := getBearerToken(r.creds, true)
 		if err != nil {
