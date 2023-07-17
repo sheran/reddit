@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"math"
 	"net/http"
 	"net/url"
 	"os"
@@ -66,7 +67,7 @@ func (rl *RateLimit) Wait() {
 
 func (rl *RateLimit) Limit() float64 {
 	lim := rl.Remaining / float64(rl.Reset)
-	return lim
+	return math.Floor(lim)
 }
 
 type Creds struct {
