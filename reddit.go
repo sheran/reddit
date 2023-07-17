@@ -235,9 +235,11 @@ func (r *Reddit) StartStream(sub string, output chan *models.Listing) {
 }
 
 func (r *Reddit) GetListing(fetchUrl *url.URL) (*models.Listing, error) {
+	var tell bool
 	if !r.Limiter.Allow() {
-		log.Println("[!!] Rate Limit hit, sleeping 2 secs")
+		log.Println("[!] Rate Limit hit, sleeping 2 secs")
 		time.Sleep(2 * time.Second)
+		tell = true
 	}
 	req, err := http.NewRequest("GET", fetchUrl.String(), nil)
 	if err != nil {
@@ -254,6 +256,9 @@ func (r *Reddit) GetListing(fetchUrl *url.URL) (*models.Listing, error) {
 	defer resp.Body.Close()
 	rl := NewRateLimit(resp.Header)            // Check
 	r.Limiter.SetLimit(rate.Limit(rl.Limit())) // and set Rate Limit
+	if tell {
+		log.Printf("Reset: %d Used:%d Remain:%.2f\n", rl.Reset, rl.Used, rl.Remaining)
+	}
 	if resp.StatusCode == 401 {
 		t, err := getBearerToken(r.creds, true)
 		if err != nil {
@@ -273,7 +278,7 @@ func (r *Reddit) GetListing(fetchUrl *url.URL) (*models.Listing, error) {
 
 func (r *Reddit) PostForm(post *models.Post) ([]byte, error) {
 	if !r.Limiter.Allow() {
-		log.Println("[!!] Rate Limit hit, sleeping 2 secs")
+		log.Println("[!] Rate Limit hit, sleeping 2 secs")
 		time.Sleep(2 * time.Second)
 	}
 	postURL := "https://oauth.reddit.com/api/submit"
