@@ -5,10 +5,10 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
 	"net/http"
 	"net/url"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -93,7 +93,7 @@ func (c *Creds) GetGrantJson() string {
 
 func readTokenFromFile() (string, error) {
 	// Read token from file
-	data, err := ioutil.ReadFile("token.txt")
+	data, err := os.ReadFile("token.txt")
 	if err != nil {
 		return "", err
 	}
@@ -136,7 +136,7 @@ func getBearerToken(creds *Creds, forceReauth bool) (string, error) {
 			if err != nil {
 				return "", err
 			}
-			if err := ioutil.WriteFile("token.txt", []byte(token), 0644); err != nil {
+			if err := os.WriteFile("token.txt", []byte(token), 0644); err != nil {
 				return "", err
 			}
 		}
@@ -146,7 +146,7 @@ func getBearerToken(creds *Creds, forceReauth bool) (string, error) {
 		if err != nil {
 			return "", err
 		}
-		if err := ioutil.WriteFile("token.txt", []byte(token), 0644); err != nil {
+		if err := os.WriteFile("token.txt", []byte(token), 0644); err != nil {
 			return "", err
 		}
 		return token, nil
@@ -319,7 +319,7 @@ func (r *Reddit) PostForm(post *models.Post) ([]byte, error) {
 		log.Println("postform is ok")
 	}
 	defer resp.Body.Close()
-	responseBody, err := ioutil.ReadAll(resp.Body)
+	responseBody, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err
 	}
