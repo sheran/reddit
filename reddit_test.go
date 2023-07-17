@@ -8,14 +8,14 @@ import (
 
 func TestScavenge(t *testing.T) {
 	log.SetFlags(log.Ldate | log.Ltime | log.Lshortfile)
-	creds, err := NewCredsFromTomlFile("creds.toml")
+	creds, err := NewCredsFromTomlFile("../reddit-stream/creds/f1newsbot_creds.toml")
 	if err != nil {
 		panic(err)
 	}
 
 	reddit := NewReddit(creds)
 	for i := 0; i < 5; i++ {
-		fmt.Println(reddit.CheckDups("NonFatF1News", "Alonso gets Saudi GP F1 podium back after penalty overturned"))
+		fmt.Println(reddit.CheckDups("SingaporeRaw", "Transport Minister S Iswaran assisting in CPIB investigation"))
 	}
 
 }

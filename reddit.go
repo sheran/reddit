@@ -59,7 +59,7 @@ func NewRateLimit(hdr http.Header) *RateLimit {
 
 func (rl *RateLimit) Wait() {
 	if rl.Remaining <= 10 {
-		log.Printf("No requests left, sleeping %d\n", rl.Reset)
+		log.Printf("[!!] No requests left, sleeping %d\n", rl.Reset)
 		time.Sleep(time.Second * time.Duration(rl.Reset))
 	}
 }
@@ -164,7 +164,7 @@ type Reddit struct {
 func NewReddit(creds *Creds) *Reddit {
 	t, err := getBearerToken(creds, false)
 	if err != nil {
-		log.Fatalf("unable to create new reddit %s\n", err.Error())
+		log.Fatalf("[!!] unable to create new reddit %s\n", err.Error())
 	}
 	return &Reddit{
 		token:      t,
@@ -236,7 +236,7 @@ func (r *Reddit) StartStream(sub string, output chan *models.Listing) {
 
 func (r *Reddit) GetListing(fetchUrl *url.URL) (*models.Listing, error) {
 	if !r.Limiter.Allow() {
-		log.Println("Rate Limit hit, sleeping 2 secs")
+		log.Println("[!!] Rate Limit hit, sleeping 2 secs")
 		time.Sleep(2 * time.Second)
 	}
 	req, err := http.NewRequest("GET", fetchUrl.String(), nil)
@@ -273,7 +273,7 @@ func (r *Reddit) GetListing(fetchUrl *url.URL) (*models.Listing, error) {
 
 func (r *Reddit) PostForm(post *models.Post) ([]byte, error) {
 	if !r.Limiter.Allow() {
-		log.Println("Rate Limit hit, sleeping 2 secs")
+		log.Println("[!!] Rate Limit hit, sleeping 2 secs")
 		time.Sleep(2 * time.Second)
 	}
 	postURL := "https://oauth.reddit.com/api/submit"
