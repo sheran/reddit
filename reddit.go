@@ -1,6 +1,7 @@
 package reddit
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -174,7 +175,7 @@ func NewReddit(creds *Creds) *Reddit {
 	return &Reddit{
 		token:      t,
 		Client:     &http.Client{},
-		Limiter:    rate.NewLimiter(rate.Every(2*time.Second), 1),
+		Limiter:    rate.NewLimiter(rate.Every(time.Second), 1),
 		ChanStream: make(chan bool),
 		creds:      creds,
 		exp:        0,
@@ -207,6 +208,7 @@ func (r *Reddit) CheckDups(sub, postTitle string) bool {
 }
 
 func (r *Reddit) StartStream(sub string, output chan *models.Listing) {
+	log.Printf("[+] starting stream on subreddit: /r/%s\n", sub)
 	go func() {
 		oldData, err := r.GetLastPost(sub, "")
 		if err != nil {
@@ -242,16 +244,14 @@ func (r *Reddit) StartStream(sub string, output chan *models.Listing) {
 
 func (r *Reddit) GetListing(fetchUrl *url.URL) (*models.Listing, error) {
 	var tell bool
-	if !r.Limiter.Allow() {
-		if r.exp < (30 * 60) {
-			r.exp += 1
-		}
+	if err := r.Limiter.Wait(context.Background()); err != nil {
 		sleep := int(math.Pow(float64(2), float64(r.exp)))
 		log.Printf("[!] Rate Limit hit, sleeping %d secs\n", sleep)
 		time.Sleep(time.Duration(sleep) * time.Second)
+		if r.exp < (2 * 60) { // top out at 2 mintutes sleep
+			r.exp += 1
+		}
 		tell = true
-	} else {
-		r.exp = 0
 	}
 	req, err := http.NewRequest("GET", fetchUrl.String(), nil)
 	if err != nil {
@@ -268,8 +268,12 @@ func (r *Reddit) GetListing(fetchUrl *url.URL) (*models.Listing, error) {
 	defer resp.Body.Close()
 	rl := NewRateLimit(resp.Header)            // Check
 	r.Limiter.SetLimit(rate.Limit(rl.Limit())) // and set Rate Limit
+	// check and reset exp when we're at more or less full capacity
+	if r.Limiter.Tokens() >= 1 {
+		r.exp = 0
+	}
 	if tell {
-		log.Printf("Reset: %d Used:%d Remain:%.2f Exp: %d\n", rl.Reset, rl.Used, rl.Remaining, r.exp)
+		log.Printf("Reset: %d Used:%d Remain:%.2f Exp: %d Limit: %.2f/s Tokens:%.2f\n", rl.Reset, rl.Used, rl.Remaining, r.exp, rl.Limit(), r.Limiter.Tokens())
 	}
 	if resp.StatusCode == 401 {
 		t, err := getBearerToken(r.creds, true)
