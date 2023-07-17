@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"log"
 	"testing"
+
+	"github.com/sheran/reddit/models"
 )
 
 func TestScavenge(t *testing.T) {
@@ -14,8 +16,12 @@ func TestScavenge(t *testing.T) {
 	}
 
 	reddit := NewReddit(creds)
-	for i := 0; i < 5; i++ {
-		fmt.Println(reddit.CheckDups("SingaporeRaw", "Transport Minister S Iswaran assisting in CPIB investigation"))
+	ch := make(chan *models.Listing)
+
+	reddit.StartStream("sneakpeekf1tests", ch)
+
+	for data := range ch {
+		fmt.Println(data.GetFirst().GetURL())
 	}
 
 }

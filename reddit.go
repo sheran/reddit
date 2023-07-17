@@ -66,6 +66,9 @@ func (rl *RateLimit) Wait() {
 }
 
 func (rl *RateLimit) Limit() float64 {
+	if rl.Reset == 0 {
+		return 1
+	}
 	lim := rl.Remaining / float64(rl.Reset)
 	return math.Floor(lim)
 }
@@ -160,6 +163,7 @@ type Reddit struct {
 	Limiter    *rate.Limiter
 	ChanStream chan bool
 	creds      *Creds
+	exp        int
 }
 
 func NewReddit(creds *Creds) *Reddit {
@@ -173,6 +177,7 @@ func NewReddit(creds *Creds) *Reddit {
 		Limiter:    rate.NewLimiter(rate.Every(2*time.Second), 1),
 		ChanStream: make(chan bool),
 		creds:      creds,
+		exp:        0,
 	}
 }
 
@@ -238,9 +243,15 @@ func (r *Reddit) StartStream(sub string, output chan *models.Listing) {
 func (r *Reddit) GetListing(fetchUrl *url.URL) (*models.Listing, error) {
 	var tell bool
 	if !r.Limiter.Allow() {
-		log.Println("[!] Rate Limit hit, sleeping 2 secs")
-		time.Sleep(2 * time.Second)
+		if r.exp < (30 * 60) {
+			r.exp += 1
+		}
+		sleep := int(math.Pow(float64(2), float64(r.exp)))
+		log.Printf("[!] Rate Limit hit, sleeping %d secs\n", sleep)
+		time.Sleep(time.Duration(sleep) * time.Second)
 		tell = true
+	} else {
+		r.exp = 0
 	}
 	req, err := http.NewRequest("GET", fetchUrl.String(), nil)
 	if err != nil {
@@ -258,7 +269,7 @@ func (r *Reddit) GetListing(fetchUrl *url.URL) (*models.Listing, error) {
 	rl := NewRateLimit(resp.Header)            // Check
 	r.Limiter.SetLimit(rate.Limit(rl.Limit())) // and set Rate Limit
 	if tell {
-		log.Printf("Reset: %d Used:%d Remain:%.2f\n", rl.Reset, rl.Used, rl.Remaining)
+		log.Printf("Reset: %d Used:%d Remain:%.2f Exp: %d\n", rl.Reset, rl.Used, rl.Remaining, r.exp)
 	}
 	if resp.StatusCode == 401 {
 		t, err := getBearerToken(r.creds, true)
