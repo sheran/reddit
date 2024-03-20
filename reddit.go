@@ -252,11 +252,11 @@ func (r *Reddit) GetListing(fetchUrl *url.URL) (*models.Listing, error) {
 		sleep := int(math.Pow(float64(2), float64(r.exp)))
 		log.Printf("[!] Rate Limit hit, sleeping %d secs\n", sleep)
 		time.Sleep(time.Duration(sleep) * time.Second)
-		if r.exp < 60 { // top out at 2 mintutes sleep
+		if r.exp < 7 {
 			r.exp += 1
 		}
 		tell = true
-		return nil, err
+		return nil, fmt.Errorf("max rate limit hit: %s", err.Error())
 	}
 
 	req, err := http.NewRequest("GET", fetchUrl.String(), nil)
@@ -365,6 +365,7 @@ func (r *Reddit) GetLastPost(sub, after string) (*models.Listing, error) {
 	}
 	data, err := r.GetListing(fetchUrl)
 	if err != nil {
+		r.exp = 0
 		return nil, err
 	}
 	return data, nil
