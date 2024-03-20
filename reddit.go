@@ -254,9 +254,10 @@ func (r *Reddit) GetListing(fetchUrl *url.URL) (*models.Listing, error) {
 		time.Sleep(time.Duration(sleep) * time.Second)
 		if r.exp < 7 {
 			r.exp += 1
+		} else {
+			return nil, fmt.Errorf("max rate limit hit resetting exp: %s", err.Error())
 		}
 		tell = true
-		return nil, fmt.Errorf("max rate limit hit: %s", err.Error())
 	}
 
 	req, err := http.NewRequest("GET", fetchUrl.String(), nil)
@@ -274,6 +275,15 @@ func (r *Reddit) GetListing(fetchUrl *url.URL) (*models.Listing, error) {
 	defer resp.Body.Close()
 	if resp.StatusCode == 200 {
 		r.exp = 0
+		rl := NewRateLimit(resp.Header)            // Check
+		r.Limiter.SetLimit(rate.Limit(rl.Limit())) // and set Rate Limit
+		// check and reset exp when we're at more or less full capacity
+		if tell {
+			log.Printf("Reset: %d Used:%d Remain:%.2f Exp: %d Limit: %.2f/s Tokens:%.2f\n", rl.Reset, rl.Used, rl.Remaining, r.exp, rl.Limit(), r.Limiter.Tokens())
+		}
+	}
+	if resp.StatusCode == 429 { // Too many requests
+		time.Sleep(30 * time.Second)
 		rl := NewRateLimit(resp.Header)            // Check
 		r.Limiter.SetLimit(rate.Limit(rl.Limit())) // and set Rate Limit
 		// check and reset exp when we're at more or less full capacity
@@ -365,7 +375,6 @@ func (r *Reddit) GetLastPost(sub, after string) (*models.Listing, error) {
 	}
 	data, err := r.GetListing(fetchUrl)
 	if err != nil {
-		r.exp = 0
 		return nil, err
 	}
 	return data, nil
