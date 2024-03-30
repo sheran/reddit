@@ -9,6 +9,7 @@ import (
 	"log"
 	"math"
 	"net/http"
+	"net/http/httputil"
 	"net/url"
 	"os"
 	"strconv"
@@ -366,7 +367,7 @@ func (r *Reddit) PostForm(post *models.Post) ([]byte, error) {
 
 }
 
-func (r *Reddit) PostUrl(subreddit, link string) ([]byte, error) {
+func (r *Reddit) PostUrl(subreddit, link, title string) ([]byte, error) {
 	if !r.Limiter.Allow() {
 		log.Println("[!] Rate Limit hit, sleeping 2 secs")
 		time.Sleep(2 * time.Second)
@@ -374,6 +375,7 @@ func (r *Reddit) PostUrl(subreddit, link string) ([]byte, error) {
 	postURL := "https://oauth.reddit.com/api/submit"
 	postData := url.Values{
 		"url":      {link},
+		"title":    {title},
 		"sr":       {subreddit},
 		"kind":     {"link"},
 		"api_type": {"json"},
@@ -398,7 +400,7 @@ func (r *Reddit) PostUrl(subreddit, link string) ([]byte, error) {
 			log.Printf("error getting token: %s\n", err.Error())
 			return nil, err
 		}
-		_, err = r.PostUrl(subreddit, link)
+		_, err = r.PostUrl(subreddit, link, title)
 		if err != nil {
 			log.Printf("error reposting url: %s\n", err.Error())
 			return nil, err
@@ -449,4 +451,59 @@ func ReadJsonListing(body io.ReadCloser) (*models.Listing, error) {
 		return nil, err
 	}
 	return data, nil
+}
+
+func (r *Reddit) DelThing(id string) ([]byte, error) {
+	if !r.Limiter.Allow() {
+		log.Println("[!] Rate Limit hit, sleeping 2 secs")
+		time.Sleep(2 * time.Second)
+	}
+	postURL := "https://oauth.reddit.com/api/del"
+	postData := url.Values{
+		"id": {id},
+	}
+	req, err := http.NewRequest("POST", postURL, strings.NewReader(postData.Encode()))
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Authorization", "bearer "+r.token)
+	req.Header.Set("User-Agent", r.creds.Agent)
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	dump, err := httputil.DumpRequestOut(req, true) // Change to false if you don't want to include body for body-less requests
+	if err != nil {
+		fmt.Println("Error dumping request:", err)
+		return nil, err
+	}
+	fmt.Println(string(dump))
+	resp, err := r.Client.Do(req)
+	if err != nil {
+		log.Printf("error in http request %d\n", resp.StatusCode)
+		return nil, err
+	}
+
+	rl := NewRateLimit(resp.Header)            // Check
+	r.Limiter.SetLimit(rate.Limit(rl.Limit())) // and set Rate Limit
+	if resp.StatusCode == 401 {
+		_, err := getBearerToken(r.creds, true)
+		if err != nil {
+			log.Printf("error getting token: %s\n", err.Error())
+			return nil, err
+		}
+		_, err = r.DelThing(id)
+		if err != nil {
+			log.Printf("error deleting thing: %s\n", err.Error())
+			return nil, err
+		}
+	} else if resp.StatusCode != 200 {
+		log.Printf("non 200 error code when posting url: %d\n", resp.StatusCode)
+	} else {
+		log.Println("delete thing is ok")
+	}
+	defer resp.Body.Close()
+	responseBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	return responseBody, nil
 }
