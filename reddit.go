@@ -373,7 +373,7 @@ func (r *Reddit) PostUrl(subreddit, link string) ([]byte, error) {
 	}
 	postURL := "https://oauth.reddit.com/api/submit"
 	postData := url.Values{
-		"link":     {link},
+		"url":      {link},
 		"sr":       {subreddit},
 		"kind":     {"link"},
 		"api_type": {"json"},
