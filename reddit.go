@@ -9,7 +9,6 @@ import (
 	"log"
 	"math"
 	"net/http"
-	"net/http/httputil"
 	"net/url"
 	"os"
 	"strconv"
@@ -469,12 +468,7 @@ func (r *Reddit) DelThing(id string) ([]byte, error) {
 	req.Header.Set("Authorization", "bearer "+r.token)
 	req.Header.Set("User-Agent", r.creds.Agent)
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	dump, err := httputil.DumpRequestOut(req, true) // Change to false if you don't want to include body for body-less requests
-	if err != nil {
-		fmt.Println("Error dumping request:", err)
-		return nil, err
-	}
-	fmt.Println(string(dump))
+
 	resp, err := r.Client.Do(req)
 	if err != nil {
 		log.Printf("error in http request %d\n", resp.StatusCode)
