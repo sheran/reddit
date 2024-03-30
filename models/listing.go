@@ -80,4 +80,5 @@ type Post struct {
 	ApiType   string `json:"api_type"`
 	Kind      string `json:"kind"`
 	Extension string `json:"extension"`
+	Url       string `json:"url"`
 }

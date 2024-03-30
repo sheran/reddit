@@ -10,7 +10,7 @@ import (
 
 func TestScavenge(t *testing.T) {
 	log.SetFlags(log.Ldate | log.Ltime | log.Lshortfile)
-	creds, err := NewCredsFromTomlFile("../reddit-stream/creds/sgnewsbot_creds.toml")
+	creds, err := NewCredsFromTomlFile("../inchident/artfetch_creds.toml")
 	if err != nil {
 		panic(err)
 	}
